@@ -6,6 +6,7 @@ const seedAdmin = async () => {
   try {
     const adminEmail = process.env.ADMIN_EMAIL;
     const adminPassword = process.env.ADMIN_PASSWORD;
+    const adminPhone = process.env.ADMIN_PHONE;
 
     const existingAdmin = await prisma.user.findUnique({
       where: {
