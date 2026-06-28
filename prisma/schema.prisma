@@ -1,0 +1,339 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  STUDENT
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
+enum PaymentStatus {
+  CREATED
+  SUCCESS
+  FAILED
+}
+
+enum PurchaseType {
+  MODULE
+  PACKAGE
+  MANUAL
+}
+
+enum TestStatus {
+  DRAFT
+  PUBLISHED
+  UNPUBLISHED
+}
+
+enum QuestionType {
+  MCQ
+  MATCH_PAIR
+  ODD_ONE_OUT
+  TRUE_FALSE
+  WRONG_PAIR
+  CORRELATION
+  ONE_WORD
+  FILL_BLANK
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  AUTO_CHECKED
+  EVALUATED
+  EXPIRED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  phone     String?  @unique
+  password  String?
+  role      Role     @default(STUDENT)
+  isActive  Boolean  @default(true)
+
+  provider AuthProvider @default(LOCAL)
+  googleId String? @unique
+
+  isEmailVerified Boolean @default(false)
+
+  emailVerifyTokenHash String?
+  emailVerifyTokenExpiresAt DateTime?
+
+  passwordResetTokenHash String?
+  passwordResetTokenExpiresAt DateTime?
+
+  refreshTokens RefreshToken[]
+  payments      Payment[]
+  accesses      StudentAccess[]
+  sessions      StudentSession[]
+  attempts      TestAttempt[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  tokenHash String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+}
+
+model Module {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String
+  subjects    String[]
+  totalTests  Int
+  price       Int
+  isActive    Boolean  @default(true)
+
+  packageModules PackageModule[]
+  payments       Payment[]
+  accesses       StudentAccess[]
+  tests          Test[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Package {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String
+  price       Int
+  totalTests  Int
+  isActive    Boolean  @default(true)
+
+  packageModules PackageModule[]
+  payments       Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PackageModule {
+  id        String @id @default(uuid())
+
+  packageId String
+  package   Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  moduleId String
+  module   Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([packageId, moduleId])
+}
+
+model Payment {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  moduleId String?
+  module   Module? @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+
+  packageId String?
+  package   Package? @relation(fields: [packageId], references: [id], onDelete: SetNull)
+
+  purchaseType PurchaseType
+  amount       Int
+  currency     String @default("INR")
+  status       PaymentStatus @default(CREATED)
+
+  razorpayOrderId   String  @unique
+  razorpayPaymentId String?
+  razorpaySignature String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StudentAccess {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  moduleId String
+  module   Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  sourcePaymentId String?
+  purchaseType    PurchaseType
+
+  isActive  Boolean   @default(true)
+  startsAt  DateTime  @default(now())
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, moduleId])
+}
+
+model StudentSession {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  deviceId  String
+  userAgent String?
+  ipAddress String?
+
+  isActive Boolean @default(true)
+
+  lastActiveAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@index([deviceId])
+}
+
+model Test {
+  id String @id @default(uuid())
+
+  title       String
+  description String?
+  instructions String?
+
+  moduleId String
+  module   Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  subject String
+
+  durationMinutes Int
+  totalMarks      Int @default(0)
+
+  status TestStatus @default(DRAFT)
+
+  questions Question[]
+  attempts  TestAttempt[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Question {
+  id String @id @default(uuid())
+
+  testId String
+  test   Test   @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  questionText String
+  questionType QuestionType
+
+  marks Int
+  orderNo Int
+
+  correctAnswer String?
+  explanation   String?
+
+  options    QuestionOption[]
+  matchPairs MatchPair[]
+  studentAnswers StudentAnswer[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([testId])
+}
+
+model QuestionOption {
+  id String @id @default(uuid())
+
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  optionText String
+  isCorrect  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+}
+
+model MatchPair {
+  id String @id @default(uuid())
+
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  leftText  String
+  rightText String
+
+  isWrong Boolean @default(false)
+
+  createdAt DateTime @default(now())
+}
+
+model TestAttempt {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  testId String
+  test   Test   @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  startedAt   DateTime @default(now())
+  submittedAt DateTime?
+
+  durationMinutes Int
+  endsAt          DateTime
+
+  status AttemptStatus @default(IN_PROGRESS)
+
+  totalScore Int @default(0)
+
+  answers StudentAnswer[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, testId])
+  @@index([userId])
+  @@index([testId])
+}
+
+model StudentAnswer {
+  id String @id @default(uuid())
+
+  attemptId String
+  attempt   TestAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  answerJson String?
+
+  isCorrect Boolean?
+  marksAwarded Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId])
+  @@index([questionId])
+}
