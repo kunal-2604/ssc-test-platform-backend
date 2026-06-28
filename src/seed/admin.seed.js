@@ -20,15 +20,25 @@ const seedAdmin = async () => {
 
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
-    await prisma.user.create({
-      data: {
-        name: "ADMIN",
+    await prisma.user.upsert({
+      where: {
+        email: adminEmail
+      },
+      update: {
+        name: "Main Admin",
+        role: "ADMIN",
+        isActive: true,
+        isEmailVerified: true
+      },
+      create: {
+        name: "Main Admin",
         email: adminEmail,
-        phone: "9552323406",
-        isEmailVerified: true,
-        provider: "LOCAL",
+        phone: adminPhone,
         password: hashedPassword,
-        role: "ADMIN"
+        role: "ADMIN",
+        provider: "LOCAL",
+        isEmailVerified: true,
+        isActive: true
       }
     });
 

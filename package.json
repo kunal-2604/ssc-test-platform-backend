@@ -10,6 +10,7 @@
     "seed:modules": "node src/seed/module.seed.js",
     "build": "prisma generate",
     "render:build": "npm install && npx prisma generate && npx prisma migrate deploy",
+    "seed:prod": "npm run seed:admin && npm run seed:modules",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
